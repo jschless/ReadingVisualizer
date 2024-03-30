@@ -15,20 +15,31 @@ token = config["token"]
 database_id = config["database_id"]
 output_graphic = config["output_graphic"]
 output_table = config["output_table"]
+bookposts = config["bookposts"]
+DEBUG = True
 
 
 def main():
     entries = pull_database()
     df = generate_dataframe(entries)
 
-    # Create new Markdown file
-    with open(output_table, "w") as f:
-        f.write(template_start + df.to_markdown(index=False) + template_end)
+    def create_rel_links(tit):
+        if tit in bookposts:
+            return f"[{tit}](/posts/{bookposts[tit]})"
+        return tit
 
     # Create plot and write to
     fig = plot(interpolate_pages_over_time(df, rolling=7))
     with open(output_graphic, "w") as f:
         pio.write_html(fig, f)
+
+    df["Title"] = df.Title.apply(create_rel_links)
+    df = df.drop(columns=["# Pages"])
+
+    # Create new Markdown file
+    with open(output_table, "w") as f:
+        f.write(template_start + df.to_markdown(index=False) + template_end)
+        print("Just overwrote " + output_table)
 
 
 def pull_database():
@@ -42,6 +53,9 @@ def parse_entry(dic):
     parsed_dict = {}
     dic = dic["properties"]
     try:
+        if DEBUG:
+            pprint(dic)
+            print()
         if dic["Status"]["select"]["name"] != "Finished" or dic["Content Type"][
             "select"
         ]["name"] not in set(["Book", "Audiobook"]):
@@ -79,7 +93,8 @@ def generate_dataframe(entries):
     df = df[
         ["Title", "Author", "Start Date", "End Date", "Score", "# Pages"]
     ].sort_values("End Date", ascending=False)
-
+    if DEBUG:
+        print(df.to_markdown())
     return df
 
 
